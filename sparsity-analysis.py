@@ -5,14 +5,14 @@ import random
 random.seed(123)
 
 
-CI, HI, WI = 128, 32, 32
-STRIDE = 2
+CI, HI, WI = 512, 14, 14
+STRIDE = 1
 PAD = 0
 KSZ = 3
 
 HO = int((HI + 2 * PAD - KSZ) / STRIDE) + 1
 WO = int((WI + 2 * PAD - KSZ) / STRIDE) + 1
-CO = 256
+CO = 1
 
 ENERGIES = dict(add=0.03, mult=0.2, read=2.5)
 
@@ -34,8 +34,11 @@ sparsities = np.array(
     [0, 0.2, 0.4, 0.6, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.95, 0.96, 0.97, 0.98, 
      0.99]
     )
+sparsities = np.array(
+    [0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
+    )
 # sparsities = np.array([0.9, 0.95, 0.96, 0.97, 0.98, 0.99])
-# sparsities = np.array([0.99])
+# sparsities = np.array([0])
 
 snn_energy = dict(
     tot=np.zeros(sparsities.shape),
@@ -143,30 +146,30 @@ snn_line = dict(
 )
 
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_line["tot"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="orange", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=ann_line["tot"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="orange", width=4),
+#     )
+# )
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_line["tot"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="red", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=snn_line["tot"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="red", width=4),
+#     )
+# )
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_energy["tot"][4:] / 1e6,
+        x=sparsities * 100,
+        y=ann_energy["tot"] / 1e3,
         mode="markers",
         marker=dict(
             color="orange",
@@ -175,48 +178,50 @@ traces.append(
             size=32,
         ),
         name="ANN",
+        showlegend=True,
     )
 )
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_energy["tot"][4:] / 1e6,
+        x=sparsities * 100,
+        y=snn_energy["tot"] / 1e3,
         mode="markers",
         marker=dict(
             color="red",
             symbol="x-dot",
             line=dict(width=2, color="darkslategrey"),
-            size=32,
+            size=32 ,
         ),
         name="SNN",
+        showlegend=True,
     )
 )
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_line["mem"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="orange", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=ann_line["mem"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="orange", width=4),
+#     )
+# )
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_line["mem"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="red", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=snn_line["mem"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="red", width=4),
+#     )
+# )
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_energy["mem"][4:] / 1e6,
+        x=sparsities * 100,
+        y=ann_energy["mem"] / 1e3,
         mode="markers",
         marker=dict(
             color="orange",
@@ -230,8 +235,8 @@ traces.append(
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_energy["mem"][4:] / 1e6,
+        x=sparsities * 100,
+        y=snn_energy["mem"] / 1e3,
         mode="markers",
         marker=dict(
             color="red",
@@ -243,30 +248,30 @@ traces.append(
     )
 )
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_line["comp"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="orange", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=ann_line["comp"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="orange", width=4),
+#     )
+# )
 
-line_traces.append(
-    go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_line["comp"][4:] / 1e6,
-        mode="lines",
-        showlegend=False,
-        line=dict(color="red", width=4),
-    )
-)
+# line_traces.append(
+#     go.Scatter(
+#         x=sparsities[4:] * 100,
+#         y=snn_line["comp"][4:] / 1e6,
+#         mode="lines",
+#         showlegend=False,
+#         line=dict(color="red", width=4),
+#     )
+# )
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=ann_energy["comp"][4:] / 1e6,
+        x=sparsities * 100,
+        y=ann_energy["comp"] / 1e3,
         mode="markers",
         marker=dict(
             color="orange",
@@ -280,8 +285,8 @@ traces.append(
 
 traces.append(
     go.Scatter(
-        x=sparsities[4:] * 100,
-        y=snn_energy["comp"][4:] / 1e6,
+        x=sparsities * 100,
+        y=snn_energy["comp"] / 1e3,
         mode="markers",
         marker=dict(
             color="red",
@@ -294,28 +299,30 @@ traces.append(
 )
 
 # Show the plot
-fig.add_trace(line_traces[0], row=1, col=1)
-fig.add_trace(line_traces[1], row=1, col=1)
+# fig.add_trace(line_traces[0], row=1, col=1)
+# fig.add_trace(line_traces[1], row=1, col=1)
 fig.add_trace(traces[0], row=1, col=1)
 fig.add_trace(traces[1], row=1, col=1)
-fig.add_trace(line_traces[2], row=1, col=2)
-fig.add_trace(line_traces[3], row=1, col=2)
+# fig.add_trace(line_traces[2], row=1, col=2)
+# fig.add_trace(line_traces[3], row=1, col=2)
 fig.add_trace(traces[2], row=1, col=2)
 fig.add_trace(traces[3], row=1, col=2)
-fig.add_trace(line_traces[4], row=1, col=3)
-fig.add_trace(line_traces[5], row=1, col=3)
+# fig.add_trace(line_traces[4], row=1, col=3)
+# fig.add_trace(line_traces[5], row=1, col=3)
 fig.add_trace(traces[4], row=1, col=3)
 fig.add_trace(traces[5], row=1, col=3)
 fig.update_layout(
     title="Energy consumption v.s. input data sparsity",
-    width=2560,
-    height=1440,
+    width=2500,
+    height=1000,
     title_x=0.5,
-    yaxis=dict(title="Energy [mJ]"),
-    font=dict(family="Inconsolata", size=44),
+    title_y=1.0,
+    yaxis=dict(title="Energy [μJ]"),
+    font=dict(family="Serif", size=38),
+    legend=dict(itemsizing="trace", font=dict(size=38, family="Serif")),
 )
 fig.update_xaxes(title_text="Input data sparsity [%]", row=1, col=2)
-fig.update_annotations(font_family="Inconsolata", font_size=44)
+fig.update_annotations(font_family="Serif", font_size=44)
 
 import plotly.io as pio
 
