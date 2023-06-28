@@ -2,32 +2,42 @@ import numpy as np
 import random
 
 random.seed(123)
-RUNS=10
+RUNS=100
 
-# Fully connected layer shape.
-M, N = 512, 1024
+# Input feature map shape.
+CI, HI, WI = 512, 14, 14
+STRIDE = 1
+PAD = 0
+# Kernel weights shape.
+KSZ = 3
 
-# Energies taken from Horowitz'14.
+# Output feature map shape.
+HO = int((HI + 2 * PAD - KSZ) / STRIDE) + 1
+WO = int((WI + 2 * PAD - KSZ) / STRIDE) + 1
+CO = 1
+
+# Energies taken from Horowitz'14
 ENERGIES = dict(add=0.03, mult=0.2, memory=2.5)
 
-weights = np.empty((M, N))
-rec_weights = np.empty((M,))
-snn_state_init = np.empty((M, ))
-ann_state_init = np.empty((M, ))
-for m in range(M):
-    snn_state_init[m] = random.randint(-128, 63)
-    ann_state_init[m] = random.randint(-128, 63)
-    rec_weights[m] = random.randint(-128, 127)
-    for n in range(N):
-        weights[m][n] = random.randint(-128, 127)
+weights = np.empty((CO, CI, KSZ, KSZ))
+state_init = np.empty((CO, HO, WO))
+for co in range(CO):
+    for ho in range(HO):
+        for wo in range(WO):
+            state_init[co][ho][wo] = random.randint(-128, 63)
+    for ci in range(CI):
+        for hk in range(KSZ):
+            for wk in range(KSZ):
+                weights[co][ci][hk][wk] = random.randint(-128, 127)
 
-ifmap_snn = np.empty((N,), dtype=int)
-ifmap_ann = np.empty((N,), dtype=int)
+ifmap_snn = np.empty((CI, HI, WI), dtype=int)
+ifmap_ann = np.empty((CI, HI, WI), dtype=int)
 
 # sparsities = np.array(
 #     [0, 0.2, 0.4, 0.6, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.95, 0.96, 0.97, 0.98, 
 #      0.99]
-#         )
+#     )
+
 sparsities = np.array(
     [0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
     )
@@ -46,72 +56,72 @@ ann_energy = dict(
 for i, sparsity in enumerate(sparsities):
     print("*" * 50 + "\nSparsity: {}".format(int(sparsity * 100)) + "%.")
     for run in range(RUNS):
-
         # Generating random input values according to sparsity.
-        for n in range(N):
-            val = int(random.uniform(0, 1) > sparsity)
-            ifmap_snn[n] = val
-            ifmap_ann[n] = random.randint(-128, 127) * val
+        for ci in range(CI):
+            for hi in range(HI):
+                for wi in range(WI):
+                    val = int(random.uniform(0, 1) > sparsity)
+                    ifmap_snn[ci][hi][wi] = val
+                    ifmap_ann[ci][hi][wi] = random.randint(-128, 127) * val
 
-        snn_state = snn_state_init.copy()
-        ann_state = ann_state_init.copy()
-        for m in range(M):
-            buff_snn, buff_ann = 0, 0
-            got_spike = False
-            got_non_zero = False
-            for n in range(N):
-                if ifmap_snn[n] == 1:
+        # SNN state.
+        state = state_init.copy()
+        for co in range(CO):
+            for ho in range(HO):
+                for wo in range(WO):
+                    buff_snn, buff_ann = 0, 0
+                    got_spike = False
+                    for ci in range(CI):
+                        for hk in range(KSZ):
+                            for wk in range(KSZ):
+                                wi = wo * STRIDE + wk
+                                hi = ho * STRIDE + hk
+                                if ifmap_snn[ci][hi][wi] == 1:
+                                    snn_energy["mem"][i] += ENERGIES["memory"] / 8
+                                    got_spike = True
+                                    snn_energy["mem"][i] += ENERGIES["memory"]
+                                    buff_snn += weights[co][ci][hk][wk]
+                                    snn_energy["comp"][i] += ENERGIES["add"]
+
+                                if ifmap_ann[ci][hi][wi] != 0:
+                                    ann_energy["mem"][i] += ENERGIES["memory"]
+                                    ann_energy["mem"][i] += ENERGIES["memory"]
+                                    ann_energy["comp"][i] += ENERGIES["mult"]
+                                    buff_ann += (
+                                        ifmap_ann[ci][hi][wi] * weights[co][ci][hk][wk]
+                                    )
+                                    ann_energy["comp"][i] += ENERGIES["add"]
+
+                    if got_spike:
+                        # Read state
+                        mem = state[co][ho][wo]
+                        snn_energy["mem"][i] += ENERGIES["memory"]
+                        # Apply leakage.
+                        mem *= 0.95
+                        snn_energy["comp"][i] += ENERGIES["mult"]
+                        # Accumulate activation.
+                        mem += buff_snn
+                        snn_energy["comp"][i] += ENERGIES["add"]
+                        # Thresholding.
+                        if mem > 64:
+                            # Subtract threshold.
+                            mem -= 64
+                            snn_energy["comp"][i] += ENERGIES["add"]
+                            out_spike = 1
+                        # Write back the membrane.
+                        snn_energy["mem"][i] += ENERGIES["memory"]
+                    # Write output spike.
                     snn_energy["mem"][i] += ENERGIES["memory"] / 8
-                    got_spike = True
-                    snn_energy["mem"][i] += ENERGIES["memory"]
-                    buff_snn += weights[m][n]
-                    snn_energy["comp"][i] += ENERGIES["add"]
+                    ann_energy["mem"][i] += ENERGIES["memory"]  
 
-                if ifmap_ann[n] != 0:
-                    ann_energy["mem"][i] += ENERGIES["memory"]
-                    got_non_zero = True
-                    ann_energy["mem"][i] += ENERGIES["memory"]
-                    ann_energy["comp"][i] += ENERGIES["mult"]
-                    ann_energy["comp"][i] += ENERGIES["add"]
-                    buff_ann += (
-                        ifmap_ann[n] * weights[m][n]
-                    )
-
-            if got_spike:
-                mem = snn_state[m]
-                snn_energy["mem"][i] += ENERGIES["memory"]
-                mem *= 0.95
-                snn_energy["comp"][i] += ENERGIES["mult"]
-                mem += buff_snn
-                snn_energy["comp"][i] += ENERGIES["add"]
-                if mem > 64:
-                    mem -= 64
-                    snn_energy["comp"][i] += ENERGIES["add"]
-                    out_spike = 1
-                snn_energy["mem"][i] += ENERGIES["memory"]
-            snn_energy["mem"][i] += ENERGIES["memory"] / 8
-
-            if got_non_zero:
-                ann_energy["mem"][i] += ENERGIES["memory"]  
-                h = ann_state[m]
-                ann_energy["mem"][i] += ENERGIES["memory"] 
-                w = rec_weights[m]
-                ann_energy["comp"][i] += ENERGIES["mult"]
-                h += w*h + buff_ann
-                ann_energy["comp"][i] += ENERGIES["add"]
-                ann_state[m] = h
-                ann_energy["mem"][i] += ENERGIES["memory"] 
-            ann_energy["mem"][i] += ENERGIES["memory"] 
-
+    # Avearage energies along the runs.
+    ann_energy["mem"][i] /= RUNS
+    snn_energy["mem"][i] /= RUNS
+    ann_energy["comp"][i] /= RUNS
+    snn_energy["comp"][i] /= RUNS
     ann_energy["tot"][i] = ann_energy["mem"][i] + ann_energy["comp"][i]
     snn_energy["tot"][i] = snn_energy["mem"][i] + snn_energy["comp"][i]
 
-    ann_energy["tot"][i] /= RUNS
-    ann_energy["mem"][i] /= RUNS
-    ann_energy["comp"][i] /= RUNS
-    snn_energy["tot"][i] /= RUNS
-    snn_energy["mem"][i] /= RUNS
-    snn_energy["comp"][i] /= RUNS
     print("SNN:")
     print(f"\t- Total energy: {snn_energy['tot'][i]/1e3:.2f} uJ.")
     print(f"\t- Memory energy: {snn_energy['mem'][i]/1e3:.2f} uJ.")
@@ -120,7 +130,6 @@ for i, sparsity in enumerate(sparsities):
     print(f"\t- Total energy: {ann_energy['tot'][i]/1e3:.2f} uJ.")
     print(f"\t- Memory energy: {ann_energy['mem'][i]/1e3:.2f} uJ.")
     print(f"\t- Computations energy: {ann_energy['comp'][i]/1e3:.2f} uJ.")
-
 
 PRINT_FOR_LATEX = False
 if PRINT_FOR_LATEX:
@@ -142,13 +151,12 @@ if PRINT_FOR_LATEX:
     print("*"*50)
     for i, s in enumerate(sparsities):
         print(f"({s*100:.0f}, {snn_energy['comp'][i]/1e3:.2f})")
-    print("*"*50)
 
 PLOT = False
 if PLOT:
     import plotly.graph_objects as go
-    import plotly.io as pio
     from plotly.subplots import make_subplots
+    import plotly.io as pio
 
     fig = make_subplots(
         rows=1,
@@ -346,6 +354,6 @@ if PLOT:
     fig.update_xaxes(title_text="Input data sparsity [%]", row=1, col=2)
     fig.update_annotations(font_family="Serif", font_size=44)
 
-    pio.write_image(fig, "energy-analysis-rnn.png")
-    pio.write_image(fig, "energy-analysis-rnn.svg")
+    pio.write_image(fig, "energy-analysis-cnn.png")
+    pio.write_image(fig, "energy-analysis-cnn.svg")
     fig.show()
